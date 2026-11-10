@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XAUUSD Tradingbot Dashboard</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#131b2e;--line:#26334d;--muted:#91a0b9;--text:#edf2fb;--gold:#e7b85c;--green:#38c98b;--red:#fa7373;--blue:#78a9ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#0b1020,#10192b);color:var(--text);font:14px/1.5 Inter,system-ui,Segoe UI,Arial,sans-serif}
+header{padding:22px 26px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:18px;align-items:center;flex-wrap:wrap}
+h1{font-size:21px;margin:0}h1 span{color:var(--gold)}.sub,.muted{color:var(--muted)}.status{border:1px solid var(--line);border-radius:30px;padding:7px 12px;font-size:12px}
+main{max-width:1440px;margin:auto;padding:22px;display:grid;gap:16px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.panel,.metric{background:rgba(19,27,46,.94);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.metric small{color:var(--muted)}.metric strong{display:block;font-size:24px;margin-top:6px;font-variant-numeric:tabular-nums}.positive{color:var(--green)}.negative{color:var(--red)}
+.layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:16px}.panel h2{font-size:15px;margin:0 0 14px}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button,select,input{background:#0d1527;color:var(--text);border:1px solid #34435f;border-radius:8px;padding:9px 11px;font:inherit}
+button{cursor:pointer}button.primary{background:#9a712b;border-color:#c99b4c;color:#fff}button:disabled{opacity:.5;cursor:not-allowed}
+input{width:100%}label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
+canvas{width:100%;height:310px;display:block;background:#0d1527;border-radius:9px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #202c42}.row:last-child{border:0}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.formgrid label{margin-top:0}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:10px 7px;border-bottom:1px solid #26334d;white-space:nowrap}th{color:var(--muted);font-weight:500}
+.tablewrap{overflow:auto}.pill{border-radius:20px;padding:3px 8px;background:#202c42;font-size:11px}.buy{color:var(--green)}.sell{color:var(--red)}
+.note{font-size:12px;color:var(--muted);line-height:1.55}.warning{border-left:3px solid var(--gold);padding:10px 12px;background:#211d17;color:#dfc99f;border-radius:6px;font-size:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.wide{grid-column:1/-1}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}
+@media(max-width:520px){main{padding:12px}.grid{grid-template-columns:1fr 1fr}.metric strong{font-size:18px}header{padding:16px}}
+</style></head>
+<body>
+<header><div><h1><span>GOLD</span> DESK <span class="muted">/ XAUUSD</span></h1><div class="sub">Paper-Trading Dashboard · FOREXCOM:XAUUSD</div></div><div class="status" id="connection">● Nicht verbunden</div></header>
+<main>
+<div class="grid">
+ <div class="metric"><small>Goldpreis · USD/oz</small><strong id="price">—</strong><small id="change">Warte auf Kursdaten</small></div>
+ <div class="metric"><small>Bid / Ask</small><strong id="bidask" style="font-size:18px">— / —</strong><small>GoldAPI Echtzeitquote</small></div>
+ <div class="metric"><small>Spread</small><strong id="spread">—</strong><small id="range">Tagesrange: —</small></div>
+ <div class="metric"><small>Paper-Kontostand</small><strong id="balance">$1,000.00</strong><small id="equity">Equity: $1,000.00</small></div>
+</div>
+<div class="layout">
+<section class="panel"><div class="toolbar"><h2 style="margin:0 auto 0 0">XAUUSD Kursverlauf</h2><select id="interval"><option value="1min">M1</option><option value="5min">M5</option><option value="15min" selected>M15</option><option value="1h">H1</option></select><button id="refresh">Aktualisieren</button></div><canvas id="chart" width="1000" height="360"></canvas><div class="row"><span class="muted">Trend</span><strong id="trend">—</strong></div><div class="row"><span class="muted">Trend Bot</span><strong id="trendSignal">Warte auf Daten</strong></div><div class="row"><span class="muted">Zone Bot</span><strong id="zoneSignal">Warte auf Daten</strong></div></section>
+<section class="panel"><h2>Verbindung & Einstellungen</h2>
+<label>GoldAPI.io API-Key</label><input id="goldKey" type="password" placeholder="GoldAPI-Key eintragen">
+<label>Twelve Data API-Key (Kerzen)</label><input id="twelveKey" type="password" placeholder="Twelve Data-Key eintragen">
+<div class="actions" style="margin-top:12px"><button class="primary" id="saveKeys">Keys speichern</button><button id="forgetKeys">Löschen</button></div>
+<div class="row" style="margin-top:12px"><span class="muted">Bot-Automatik</span><strong id="botStatus">AUS</strong></div>
+<div class="actions"><button class="primary" id="toggleBot">Automatik starten</button><button id="reset">Konto zurücksetzen</button></div>
+<div class="row"><span class="muted">Risiko pro Trade</span><strong>0,5 %</strong></div>
+<div class="row"><span class="muted">Max. offene Trades</span><strong>2</strong></div>
+<div class="row"><span class="muted">Aktualisierung</span><strong>60 Sekunden</strong></div>
+<p class="note">API-Schlüssel werden nur in diesem Browser lokal gespeichert. Beim direkten Öffnen als Datei können Browser-CORS-Regeln API-Anfragen blockieren. In diesem Fall ist ein kleiner Backend-Proxy erforderlich.</p>
+</section></div>
+<section class="panel"><div class="toolbar"><h2 style="margin:0 auto 0 0">Paper-Trades</h2><span class="pill" id="openCount">0 offen</span></div>
+<div class="tablewrap"><table><thead><tr><th>Richtung</th><th>Einstieg</th><th>Stop-Loss</th><th>Take-Profit</th><th>Stückzahl (oz)</th><th>Unrealisierter P/L</th><th>Aktion</th></tr></thead><tbody id="trades"><tr><td colspan="7" class="muted">Noch keine Trades</td></tr></tbody></table></div>
+</section>
+<section class="panel"><h2>Manueller Paper-Trade</h2><div class="formgrid">
+<div><label>Richtung</label><select id="direction"><option value="BUY">BUY / Long</option><option value="SELL">SELL / Short</option></select></div>
+<div><label>Stop-Loss Abstand (USD)</label><input id="slDistance" type="number" value="8" min="0.1" step="0.1"></div>
+<div><label>Take-Profit Abstand (USD)</label><input id="tpDistance" type="number" value="16" min="0.1" step="0.1"></div>
+<div><label>Kontorisiko</label><input value="0,5 % (fest)" disabled></div></div><div class="actions" style="margin-top:12px"><button class="primary" id="openTrade">Paper-Trade eröffnen</button></div><p class="note">Positionsgröße wird aus 0,5 % Kontorisiko und Stop-Abstand berechnet. BUY-Einstieg nutzt Ask, SELL-Einstieg nutzt Bid.</p></section>
+<div class="warning wide">Nur Simulation, kein echtes Trading und keine Orderweiterleitung an einen Broker. Die Bots verwenden einfache EMA-/Breakout-Regeln und sind nicht auf Profitabilität geprüft. Kein Anlage- oder Tradingrat. Das Dashboard läuft und aktualisiert sich nur, solange diese Seite geöffnet ist. Es gibt keinen 24/7-Hintergrunddienst.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let quote=null,candles=[],trades=JSON.parse(localStorage.getItem('xau_trades')||'[]'),balance=Number(localStorage.getItem('xau_balance')||1000),bot=localStorage.getItem('xau_bot')==='1',lastBotBar=null;
+$('goldKey').value=localStorage.getItem('gold_key')||'';$('twelveKey').value=localStorage.getItem('twelve_key')||'';
+const money=n=>Number.isFinite(n)?'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+function save(){localStorage.setItem('xau_trades',JSON.stringify(trades));localStorage.setItem('xau_balance',String(balance));localStorage.setItem('xau_bot',bot?'1':'0')}
+function setStatus(t,ok=false){$('connection').textContent=(ok?'● ':'● ')+t;$('connection').style.color=ok?'var(--green)':'var(--gold)'}
+async function getQuote(){const key=$('goldKey').value.trim();if(!key)throw Error('GoldAPI-Key fehlt');const r=await fetch('https://www.goldapi.io/api/XAU/USD',{headers:{'x-access-token':key,'Content-Type':'application/json'}});if(!r.ok)throw Error('GoldAPI HTTP '+r.status);const d=await r.json();quote={price:+d.price,bid:+d.bid,ask:+d.ask,high:+d.high_price,low:+d.low_price,change:+d.change,changePct:+d.change_percent};$('price').textContent=money(quote.price);$('bidask').textContent=quote.bid.toFixed(2)+' / '+quote.ask.toFixed(2);$('spread').textContent=money(quote.ask-quote.bid);$('range').textContent='Tagesrange: '+quote.low.toFixed(2)+' – '+quote.high.toFixed(2);$('change').textContent=(quote.change>=0?'+':'')+quote.change.toFixed(2)+' ('+quote.changePct.toFixed(2)+' %)';$('change').className=quote.change>=0?'positive':'negative';setStatus('GoldAPI verbunden',true)}
+async function getCandles(){const key=$('twelveKey').value.trim();if(!key)throw Error('Twelve Data-Key fehlt');const interval=$('interval').value;const url='https://api.twelvedata.com/time_series?symbol=XAU/USD&interval='+encodeURIComponent(interval)+'&outputsize=120&apikey='+encodeURIComponent(key);const r=await fetch(url);if(!r.ok)throw Error('Twelve Data HTTP '+r.status);const d=await r.json();if(d.status==='error'||!d.values)throw Error(d.message||'Keine Kerzendaten');candles=d.values.slice().reverse().map(x=>({time:x.datetime,open:+x.open,high:+x.high,low:+x.low,close:+x.close}));drawChart();analyse()}
+function ema(vals,period){let k=2/(period+1),out=[];vals.forEach((v,i)=>out.push(i? v*k+out[i-1]*(1-k):v));return out}
+function analyse(){if(candles.length<25)return;const c=candles.map(x=>x.close),e9=ema(c,9),e21=ema(c,21),i=c.length-1;const trend=e9[i]>e21[i]?'Aufwärtstrend':e9[i]<e21[i]?'Abwärtstrend':'Seitwärts';$('trend').textContent=trend;$('trend').className=e9[i]>e21[i]?'positive':e9[i]<e21[i]?'negative':'';let ts=e9[i]>e21[i]&&c[i]>c[i-1]?'BUY':e9[i]<e21[i]&&c[i]<c[i-1]?'SELL':'NEUTRAL';$('trendSignal').textContent=ts;const recent=candles.slice(-21,-1),hi=Math.max(...recent.map(x=>x.high)),lo=Math.min(...recent.map(x=>x.low));let zs=c[i]>hi?'BUY':c[i]<lo?'SELL':'NEUTRAL';$('zoneSignal').textContent=zs; if(bot)runBot(ts,zs,candles[i]);}
+function drawChart(){const cv=$('chart'),ctx=cv.getContext('2d'),w=cv.width,h=cv.height;ctx.clearRect(0,0,w,h);if(!candles.length)return;const arr=candles.slice(-80),min=Math.min(...arr.map(x=>x.low)),max=Math.max(...arr.map(x=>x.high)),pad=24,step=(w-pad*2)/arr.length,y=v=>h-pad-(v-min)/(max-min||1)*(h-pad*2);ctx.strokeStyle='#26334d';ctx.lineWidth=1;for(let j=0;j<5;j++){let yy=pad+j*(h-2*pad)/4;ctx.beginPath();ctx.moveTo(pad,yy);ctx.lineTo(w-pad,yy);ctx.stroke()}arr.forEach((c,i)=>{let x=pad+i*step+step/2;ctx.strokeStyle=c.close>=c.open?'#38c98b':'#fa7373';ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(x,y(c.high));ctx.lineTo(x,y(c.low));ctx.stroke();let top=y(Math.max(c.open,c.close)),bottom=y(Math.min(c.open,c.close));ctx.fillRect(x-step*.28,top,Math.max(2,step*.56),Math.max(1,bottom-top))});ctx.fillStyle='#91a0b9';ctx.font='12px sans-serif';ctx.fillText(max.toFixed(2),pad+4,16);ctx.fillText(min.toFixed(2),pad+4,h-6)}
+function openPaper(side,price,slDist,tpDist,source='MANUELL'){if(trades.filter(t=>t.status==='OPEN').length>=2)return;const risk=balance*.005,qty=risk/slDist;if(!Number.isFinite(qty)||qty<=0)return;const sign=side==='BUY'?1:-1;trades.push({id:Date.now()+Math.random(),side,entry:price,sl:price-sign*slDist,tp:price+sign*tpDist,qty,source,status:'OPEN',time:new Date().toISOString()});save();render()}
+function runBot(ts,zs,bar){if(!quote||!bar||bar.time===lastBotBar)return;lastBotBar=bar.time;let side=ts===zs&&ts!=='NEUTRAL'?ts:null;if(!side||trades.filter(t=>t.status==='OPEN').length>=2)return;const sl=8,tp=16,px=side==='BUY'?quote.ask:quote.bid;openPaper(side,px,sl,tp,'BOT')}
+function manageTrades(){if(!quote)return;for(const t of trades.filter(x=>x.status==='OPEN')){const px=t.side==='BUY'?quote.bid:quote.ask;const hit=t.side==='BUY'?(px<=t.sl||px>=t.tp):(px>=t.sl||px<=t.tp);if(hit){const exit=px,pnl=(t.side==='BUY'?exit-t.entry:t.entry-exit)*t.qty;t.status='CLOSED';t.exit=exit;t.pnl=pnl;balance+=pnl}}save();render()}
+function render(){const open=trades.filter(t=>t.status==='OPEN');$('openCount').textContent=open.length+' offen';$('balance').textContent=money(balance);const unreal=open.reduce((s,t)=>s+(quote?(t.side==='BUY'?quote.bid-t.entry:t.entry-quote.ask)*t.qty:0),0);$('equity').textContent='Equity: '+money(balance+unreal);$('trades').innerHTML=trades.length?trades.slice().reverse().map(t=>{const pnl=t.status==='OPEN'&&quote?(t.side==='BUY'?quote.bid-t.entry:t.entry-quote.ask)*t.qty:t.pnl||0;return '<tr><td class="'+(t.side==='BUY'?'buy':'sell')+'">'+t.side+' <span class="muted">'+t.source+'</span></td><td>'+t.entry.toFixed(2)+'</td><td>'+t.sl.toFixed(2)+'</td><td>'+t.tp.toFixed(2)+'</td><td>'+t.qty.toFixed(4)+'</td><td class="'+(pnl>=0?'positive':'negative')+'">'+money(pnl)+' '+(t.status==='CLOSED'?'(geschlossen)':'')+'</td><td>'+(t.status==='OPEN'?'<button data-close="'+t.id+'">Schließen</button>':'—')+'</td></tr>'}).join(''):'<tr><td colspan="7" class="muted">Noch keine Trades</td></tr>';document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeTrade(Number(b.dataset.close)))}
+function closeTrade(id){const t=trades.find(x=>x.id===id);if(!t||t.status!=='OPEN'||!quote)return;const px=t.side==='BUY'?quote.bid:quote.ask;t.pnl=(t.side==='BUY'?px-t.entry:t.entry-px)*t.qty;t.exit=px;t.status='CLOSED';balance+=t.pnl;save();render()}
+async function refresh(){try{await getQuote();await getCandles();manageTrades()}catch(e){setStatus(e.message);console.warn(e)}}
+$('saveKeys').onclick=()=>{localStorage.setItem('gold_key',$('goldKey').value.trim());localStorage.setItem('twelve_key',$('twelveKey').value.trim());refresh()};
+$('forgetKeys').onclick=()=>{localStorage.removeItem('gold_key');localStorage.removeItem('twelve_key');$('goldKey').value='';$('twelveKey').value='';setStatus('API-Schlüssel gelöscht')};
+$('refresh').onclick=refresh;$('interval').onchange=()=>getCandles().catch(e=>setStatus(e.message));
+$('openTrade').onclick=()=>{if(!quote)return alert('Zuerst Kursdaten laden.');const side=$('direction').value,sl=Number($('slDistance').value),tp=Number($('tpDistance').value);if(sl<=0||tp<=0)return alert('SL- und TP-Abstand müssen größer 0 sein.');openPaper(side,side==='BUY'?quote.ask:quote.bid,sl,tp);};
+$('toggleBot').onclick=()=>{bot=!bot;save();$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';if(bot)analyse()};
+$('reset').onclick=()=>{if(confirm('Paper-Konto und Trade-Historie wirklich zurücksetzen?')){trades=[];balance=1000;save();render()}};
+$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';render();refresh();setInterval(refresh,60000);
+</script></body></html>
