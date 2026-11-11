@@ -31,3 +31,14 @@ Keep MT5, the EA, the Python bridge, and the browser open while using the live d
 - Bid/Ask and spread are broker-terminal values. Actual account fees, swaps, contract size, and execution conditions must be checked in the instrument specification inside MT5.
 - Standard STP is generally spread-based for eligible instruments; do not assume every fee is zero. Overnight swaps may apply.
 - This does not verify profitability or guarantee execution prices.
+
+## Public Telegram signal feed
+
+The local bridge also reads the public web previews (no Telegram login) for:
+- https://t.me/s/ssfgold
+- https://t.me/s/xauempirefx
+- https://t.me/s/Free_signals
+
+It polls these pages approximately once per minute and exposes the parsed results at `/api/telegram-signals`. The dashboard displays signals only when the post contains XAUUSD/Gold, BUY or SELL, an entry, an SL, and a TP with a directionally consistent price structure. Posts that cannot be parsed confidently are skipped.
+
+This is a best-effort reader of Telegram's public HTML preview, not the Telegram Bot API. Telegram can change the page structure, limit requests, or remove public access. The parser has not been validated against every post format; check each detected signal against the original post before relying on it. The displayed consensus is a count of detected posts, not a verified performance score. Telegram signals are not used to send live orders.
