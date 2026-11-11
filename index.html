@@ -56,11 +56,18 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;p
 <div><label>Stop-Loss Abstand (USD)</label><input id="slDistance" type="number" value="8" min="0.1" step="0.1"></div>
 <div><label>Take-Profit Abstand (USD)</label><input id="tpDistance" type="number" value="16" min="0.1" step="0.1"></div>
 <div><label>Kontorisiko</label><input value="0,5 % (fest)" disabled></div></div><div class="actions" style="margin-top:12px"><button class="primary" id="openTrade">Paper-Trade eröffnen</button></div><p class="note">Positionsgröße wird aus 0,5 % Kontorisiko und Stop-Abstand berechnet. BUY-Einstieg nutzt Ask, SELL-Einstieg nutzt Bid.</p></section>
+<section class="panel wide">
+<div class="toolbar"><h2 style="margin:0 auto 0 0">Telegram · öffentliche Gold-Signale</h2><span class="pill" id="tgStatus">Wird geladen …</span><button id="tgRefresh">Jetzt abrufen</button></div>
+<div class="row"><span class="muted">Telegram-Konsens</span><strong id="tgConsensus">Noch keine Signale</strong></div>
+<div class="row"><span class="muted">Quellenstatus</span><span id="tgSources" class="muted">Prüfe öffentliche Vorschauen …</span></div>
+<div class="tablewrap"><table><thead><tr><th>Quelle / Zeit</th><th>Richtung</th><th>Entry</th><th>SL</th><th>TP</th><th>Prüfung</th></tr></thead><tbody id="tgSignals"><tr><td colspan="6" class="muted">Öffentliche Telegram-Beiträge werden abgerufen …</td></tr></tbody></table></div>
+<p class="note">Es werden nur öffentlich sichtbare Telegram-Vorschauen ohne Login gelesen. Angezeigt werden nur erkannte XAUUSD-Signale mit Richtung, Entry, Stop-Loss und Take-Profit. Unklare Beiträge werden ausgelassen. Quellen können Beiträge ändern, löschen oder den öffentlichen Zugriff einschränken. Telegram-Signale sind externe Hinweise, keine geprüften Empfehlungen und lösen keine echten Orders aus.</p>
+</section>
 <div class="warning wide">Nur Simulation, kein echtes Trading und keine Orderweiterleitung an einen Broker. Die Bots verwenden einfache EMA-/Breakout-Regeln und sind nicht auf Profitabilität geprüft. Kein Anlage- oder Tradingrat. Das Dashboard läuft und aktualisiert sich nur, solange diese Seite geöffnet ist. Es gibt keinen 24/7-Hintergrunddienst.</div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-let quote=null,candles=[],trades=JSON.parse(localStorage.getItem('xau_trades')||'[]'),balance=Number(localStorage.getItem('xau_balance')||1000),bot=localStorage.getItem('xau_bot')==='1',lastBotBar=null;
+let quote=null,candles=[],telegramSignals=[],trades=JSON.parse(localStorage.getItem('xau_trades')||'[]'),balance=Number(localStorage.getItem('xau_balance')||1000),bot=localStorage.getItem('xau_bot')==='1',lastBotBar=null;
 $('twelveKey').value=localStorage.getItem('twelve_key')||'';
 const money=n=>Number.isFinite(n)?'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 function save(){localStorage.setItem('xau_trades',JSON.stringify(trades));localStorage.setItem('xau_balance',String(balance));localStorage.setItem('xau_bot',bot?'1':'0')}
@@ -75,6 +82,21 @@ function runBot(ts,zs,bar){if(!quote||!bar||bar.time===lastBotBar)return;lastBot
 function manageTrades(){if(!quote)return;for(const t of trades.filter(x=>x.status==='OPEN')){const px=t.side==='BUY'?quote.bid:quote.ask;const hit=t.side==='BUY'?(px<=t.sl||px>=t.tp):(px>=t.sl||px<=t.tp);if(hit){const exit=px,pnl=(t.side==='BUY'?exit-t.entry:t.entry-exit)*t.qty;t.status='CLOSED';t.exit=exit;t.pnl=pnl;balance+=pnl}}save();render()}
 function render(){const open=trades.filter(t=>t.status==='OPEN');$('openCount').textContent=open.length+' offen';$('balance').textContent=money(balance);const unreal=open.reduce((s,t)=>s+(quote?(t.side==='BUY'?quote.bid-t.entry:t.entry-quote.ask)*t.qty:0),0);$('equity').textContent='Equity: '+money(balance+unreal);$('trades').innerHTML=trades.length?trades.slice().reverse().map(t=>{const pnl=t.status==='OPEN'&&quote?(t.side==='BUY'?quote.bid-t.entry:t.entry-quote.ask)*t.qty:t.pnl||0;return '<tr><td class="'+(t.side==='BUY'?'buy':'sell')+'">'+t.side+' <span class="muted">'+t.source+'</span></td><td>'+t.entry.toFixed(2)+'</td><td>'+t.sl.toFixed(2)+'</td><td>'+t.tp.toFixed(2)+'</td><td>'+t.qty.toFixed(4)+'</td><td class="'+(pnl>=0?'positive':'negative')+'">'+money(pnl)+' '+(t.status==='CLOSED'?'(geschlossen)':'')+'</td><td>'+(t.status==='OPEN'?'<button data-close="'+t.id+'">Schließen</button>':'—')+'</td></tr>'}).join(''):'<tr><td colspan="7" class="muted">Noch keine Trades</td></tr>';document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeTrade(Number(b.dataset.close)))}
 function closeTrade(id){const t=trades.find(x=>x.id===id);if(!t||t.status!=='OPEN'||!quote)return;const px=t.side==='BUY'?quote.bid:quote.ask;t.pnl=(t.side==='BUY'?px-t.entry:t.entry-px)*t.qty;t.exit=px;t.status='CLOSED';balance+=t.pnl;save();render()}
+function renderTelegram(data){
+ telegramSignals=data.signals||[];
+ const buys=telegramSignals.filter(s=>s.side==='BUY').length, sells=telegramSignals.filter(s=>s.side==='SELL').length;
+ $('tgConsensus').textContent=telegramSignals.length?('BUY '+buys+' · SELL '+sells+' · '+(buys>sells?'BUY-Mehrheit':sells>buys?'SELL-Mehrheit':'Gleichstand')):'Noch keine vollständigen Signale';
+ $('tgConsensus').className=buys>sells?'positive':sells>buys?'negative':'';
+ const sources=Object.values(data.sources||{});
+ $('tgSources').textContent=sources.length?sources.map(s=>s.name+': '+(s.ok?'OK ('+s.signals_found+' Signale)':'nicht erreichbar')).join(' · '):'Noch kein Quellenstatus';
+ $('tgStatus').textContent=data.checked_at?'Letzter Abruf: '+new Date(data.checked_at).toLocaleTimeString():'Wird geladen …';
+ $('tgSignals').innerHTML=telegramSignals.length?telegramSignals.slice(0,30).map(s=>'<tr><td><a href="'+s.url+'" target="_blank" rel="noopener" style="color:var(--blue)">'+s.source+'</a><br><span class="muted">'+(s.time?new Date(s.time).toLocaleString():'Zeit unbekannt')+'</span></td><td class="'+(s.side==='BUY'?'buy':'sell')+'">'+s.side+'</td><td>'+s.entry_label+'</td><td>'+Number(s.sl).toFixed(2)+'</td><td>'+Number(s.tp).toFixed(2)+'</td><td><span class="pill">Erkannt · ungeprüft</span></td></tr>').join(''):'<tr><td colspan="6" class="muted">Noch keine vollständigen Signale erkannt. Quellenstatus oben prüfen.</td></tr>';
+}
+async function refreshTelegram(){
+ try{const r=await fetch('/api/telegram-signals',{cache:'no-store'});if(!r.ok)throw Error('Telegram-Feed nicht erreichbar');renderTelegram(await r.json())}
+ catch(e){$('tgStatus').textContent='Feed nicht erreichbar';console.warn(e)}
+}
+$('tgRefresh').onclick=async()=>{try{await fetch('/api/telegram-refresh',{method:'POST'});$('tgStatus').textContent='Abruf gestartet …';setTimeout(refreshTelegram,3500)}catch(e){$('tgStatus').textContent='Abruf fehlgeschlagen'}};
 async function refresh(){try{await getQuote();manageTrades()}catch(e){setStatus(e.message);console.warn(e)}try{await getCandles()}catch(e){console.warn('Kerzendaten:',e.message);if(!quote)setStatus(e.message)}}
 $('saveKeys').onclick=()=>{localStorage.setItem('twelve_key',$('twelveKey').value.trim());getCandles().catch(e=>setStatus(e.message))};
 $('forgetKeys').onclick=()=>{localStorage.removeItem('twelve_key');$('twelveKey').value='';setStatus('Kerzen-API-Schlüssel gelöscht')};
@@ -82,5 +104,5 @@ $('refresh').onclick=refresh;$('interval').onchange=()=>getCandles().catch(e=>se
 $('openTrade').onclick=()=>{if(!quote)return alert('Zuerst Kursdaten laden.');const side=$('direction').value,sl=Number($('slDistance').value),tp=Number($('tpDistance').value);if(sl<=0||tp<=0)return alert('SL- und TP-Abstand müssen größer 0 sein.');openPaper(side,side==='BUY'?quote.ask:quote.bid,sl,tp);};
 $('toggleBot').onclick=()=>{bot=!bot;save();$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';if(bot)analyse()};
 $('reset').onclick=()=>{if(confirm('Paper-Konto und Trade-Historie wirklich zurücksetzen?')){trades=[];balance=1000;save();render()}};
-$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';render();refresh();setInterval(()=>getQuote().then(manageTrades).catch(e=>setStatus(e.message)),1000);setInterval(()=>getCandles().catch(e=>console.warn(e)),60000);
+$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';render();refresh();setInterval(()=>getQuote().then(manageTrades).catch(e=>setStatus(e.message)),1000);setInterval(()=>getCandles().catch(e=>console.warn(e)),60000);refreshTelegram();setInterval(refreshTelegram,60000);
 </script></body></html>
