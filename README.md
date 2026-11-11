@@ -1,33 +1,40 @@
 # XAUUSD Tradingbot Dashboard
 
-Standalone browser dashboard for **XAU/USD paper trading**.
+Browser-only XAUUSD dashboard designed for GitHub Pages.
 
-## Included
-- GoldAPI.io quote display (price, bid/ask, spread, daily range and change)
-- Twelve Data candles: M1, M5, M15 and H1
-- EMA trend signal and simple range-breakout zone signal
-- Paper trading with virtual starting balance of USD 1,000
-- Fixed 0.5% account risk per trade and maximum 2 open trades
-- Stop-loss and take-profit monitoring; BUY exits use Bid and SELL exits use Ask
-- Local browser storage for API keys, balance and trade history
-- Automatic refresh every 60 seconds while the page is open
+## Funktionen
+- XAU/USD-Kurs und Kursverlauf über Twelve Data
+- Zeitrahmen M1, M5, M15 und H1
+- EMA-Trend und Range-Breakout-Analyse
+- Signal-Score von 0 bis 100 als einfache technische Bewertung
+- Manuelle Übernahme von BUY-/SELL-Signalen aus öffentlichen Telegram-Kanälen
+- Paper-Trading mit virtuellem Startguthaben von 1.000 USD
+- 0,5 % simuliertes Kontorisiko pro Trade und maximal zwei offene Trades
+- Speicherung von API-Key, Signalen und Paper-Trades lokal im Browser
 
-## Run
-Open [index.html](./index.html) in a modern browser. Enter your own GoldAPI and Twelve Data API keys in the settings panel, then save them.
+## GitHub Pages verwenden
+1. Öffne im Repository **Settings → Pages**.
+2. Wähle unter **Build and deployment** die Quelle **GitHub Actions**.
+3. Warte, bis der Workflow **Deploy static dashboard to GitHub Pages** erfolgreich abgeschlossen ist.
+4. Öffne danach die veröffentlichte Pages-Adresse.
 
-If direct API requests are blocked by provider CORS settings, the browser cannot retrieve data directly. In that case the app needs a small server-side proxy. Do not publish API keys in source code or commit them to this repository.
+Nach der Veröffentlichung läuft das Dashboard direkt im Browser. Es ist keine Python-Installation, kein lokaler Connector und keine MT5-Verbindung erforderlich.
 
-## GitHub Pages
-The included workflow deploys the static page to GitHub Pages after it is enabled in the repository settings:
-1. Open **Settings → Pages**.
-2. Under **Build and deployment**, select **GitHub Actions**.
-3. Pushes to the default branch will trigger the deployment workflow.
+## Kursdaten einrichten
+- Trage im Dashboard deinen eigenen Twelve-Data-API-Key ein und speichere ihn.
+- Der Kurs wird etwa alle 60 Sekunden abgefragt. Die Kerzen werden ebenfalls etwa alle 60 Sekunden aktualisiert.
+- Der Key wird nur im lokalen Browser-Speicher dieses Browsers abgelegt. Gib ihn nicht weiter und committe ihn nicht in das Repository.
+- Der angezeigte Kurs ist ein Anbieter-Kurs und kein ausführbarer Vantage-Bid-/Ask-Kurs. Broker-Spread, Slippage, Kommission und Swap werden nicht simuliert.
 
-## Important limitations
-- This is a **simulation only**. It does not connect to a broker or place real orders.
-- Bot signals are simple EMA and recent-range rules. They have not been backtested or validated and do not imply profitability.
-- The dashboard runs only while the browser page is open. It is not a 24/7 background service.
-- This first version uses fixed stop-loss and take-profit levels; it does not implement a trailing stop.
-- Paper-trade results do not include commissions, swaps, slippage or guaranteed execution.
+## Telegram
+GitHub Pages ist eine statische Website. Sie kann öffentliche Telegram-Kanäle nicht zuverlässig serverseitig auslesen. Deshalb enthält das Dashboard Links zu den öffentlichen Vorschauen. Signale können manuell aus dem Originalbeitrag mit Entry, SL und TP übernommen werden. Die Einträge bleiben lokal im Browser gespeichert.
 
-Use at your own risk for testing and education only. Nothing here is financial advice.
+## Wichtige Grenzen
+- Das Dashboard ist eine Simulation und sendet keine echten Orders an Vantage oder MT5.
+- Der Signal-Score ist eine selbst definierte, einfache technische Kennzahl. Er ist weder eine Trefferwahrscheinlichkeit noch ein validiertes Handelssystem.
+- EMA- und Breakout-Regeln sind nicht ausreichend backgetestet und versprechen keine Gewinne.
+- Paper-Trading nutzt den angezeigten Kurs ohne echten Broker-Spread und ohne realistische Ausführungskosten.
+- Aktualisierungen erfolgen nur, solange die Browserseite geöffnet ist. Es gibt keinen 24/7-Hintergrunddienst.
+- Verfügbarkeit, Aktualität und API-Limits hängen vom Twelve-Data-Tarif ab.
+
+Nur zu Test- und Lernzwecken. Keine Anlageberatung.
