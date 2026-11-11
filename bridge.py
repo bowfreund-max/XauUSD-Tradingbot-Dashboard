@@ -75,7 +75,7 @@ class TelegramHTMLParser(HTMLParser):
 
 def extract_posts(html):
     # Telegram's public preview uses repeated tgme_widget_message blocks.
-        blocks = re.findall(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"]+)"([\s\S]*?)(?=<div class="tgme_widget_message[^"]*"|</section>)', html)
+    blocks = re.findall(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"]+)"([\s\S]*?)(?=<div class="tgme_widget_message[^"]*"|</section>)', html)
     posts = []
     for post_id, raw in blocks:
         tm = re.search(r'<time[^>]*datetime="([^"]+)"', raw)
