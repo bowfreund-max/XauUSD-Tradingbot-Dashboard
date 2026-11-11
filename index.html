@@ -27,26 +27,26 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;p
 @media(max-width:520px){main{padding:12px}.grid{grid-template-columns:1fr 1fr}.metric strong{font-size:18px}header{padding:16px}}
 </style></head>
 <body>
-<header><div><h1><span>GOLD</span> DESK <span class="muted">/ XAUUSD</span></h1><div class="sub">Paper-Trading Dashboard · FOREXCOM:XAUUSD</div></div><div class="status" id="connection">● Nicht verbunden</div></header>
+<header><div><h1><span>GOLD</span> DESK <span class="muted">/ XAUUSD</span></h1><div class="sub">Vantage Markets · Standard STP · MT5 Live Feed · Paper-Trading</div></div><div class="status" id="connection">● Warte auf MT5</div></header>
 <main>
 <div class="grid">
  <div class="metric"><small>Goldpreis · USD/oz</small><strong id="price">—</strong><small id="change">Warte auf Kursdaten</small></div>
- <div class="metric"><small>Bid / Ask</small><strong id="bidask" style="font-size:18px">— / —</strong><small>GoldAPI Echtzeitquote</small></div>
- <div class="metric"><small>Spread</small><strong id="spread">—</strong><small id="range">Tagesrange: —</small></div>
+ <div class="metric"><small>Bid / Ask · Vantage MT5</small><strong id="bidask" style="font-size:18px">— / —</strong><small id="quoteTime">Warte auf MT5-Tick</small></div>
+ <div class="metric"><small>Spread · USD/oz</small><strong id="spread">—</strong><small id="range">Vantage Standard STP · variable Spreads</small></div>
  <div class="metric"><small>Paper-Kontostand</small><strong id="balance">$1,000.00</strong><small id="equity">Equity: $1,000.00</small></div>
 </div>
 <div class="layout">
 <section class="panel"><div class="toolbar"><h2 style="margin:0 auto 0 0">XAUUSD Kursverlauf</h2><select id="interval"><option value="1min">M1</option><option value="5min">M5</option><option value="15min" selected>M15</option><option value="1h">H1</option></select><button id="refresh">Aktualisieren</button></div><canvas id="chart" width="1000" height="360"></canvas><div class="row"><span class="muted">Trend</span><strong id="trend">—</strong></div><div class="row"><span class="muted">Trend Bot</span><strong id="trendSignal">Warte auf Daten</strong></div><div class="row"><span class="muted">Zone Bot</span><strong id="zoneSignal">Warte auf Daten</strong></div></section>
 <section class="panel"><h2>Verbindung & Einstellungen</h2>
-<label>GoldAPI.io API-Key</label><input id="goldKey" type="password" placeholder="GoldAPI-Key eintragen">
+<div class="warning">Live-Kursquelle: deine Vantage-MT5-Plattform über den lokalen MT5-Connector. MT5 und der Connector müssen laufen.</div>
 <label>Twelve Data API-Key (Kerzen)</label><input id="twelveKey" type="password" placeholder="Twelve Data-Key eintragen">
 <div class="actions" style="margin-top:12px"><button class="primary" id="saveKeys">Keys speichern</button><button id="forgetKeys">Löschen</button></div>
 <div class="row" style="margin-top:12px"><span class="muted">Bot-Automatik</span><strong id="botStatus">AUS</strong></div>
 <div class="actions"><button class="primary" id="toggleBot">Automatik starten</button><button id="reset">Konto zurücksetzen</button></div>
 <div class="row"><span class="muted">Risiko pro Trade</span><strong>0,5 %</strong></div>
 <div class="row"><span class="muted">Max. offene Trades</span><strong>2</strong></div>
-<div class="row"><span class="muted">Aktualisierung</span><strong>60 Sekunden</strong></div>
-<p class="note">API-Schlüssel werden nur in diesem Browser lokal gespeichert. Beim direkten Öffnen als Datei können Browser-CORS-Regeln API-Anfragen blockieren. In diesem Fall ist ein kleiner Backend-Proxy erforderlich.</p>
+<div class="row"><span class="muted">Live-Kursabfrage</span><strong>1 Sekunde</strong></div><div class="row"><span class="muted">Kommission</span><strong>Standard STP: separat 0*</strong></div><div class="row"><span class="muted">Kurszeit</span><strong id="feedTime">—</strong></div>
+<p class="note">Die MT5-Kurse kommen direkt von deinem angemeldeten Vantage-Konto. Die Kerzen für den Chart stammen weiterhin von Twelve Data und sind nicht der Vantage-Brokerfeed. *Bitte prüfe die für dein Konto geltenden Produktbedingungen. Swap und variable Spreads können zusätzliche Kosten verursachen.</p>
 </section></div>
 <section class="panel"><div class="toolbar"><h2 style="margin:0 auto 0 0">Paper-Trades</h2><span class="pill" id="openCount">0 offen</span></div>
 <div class="tablewrap"><table><thead><tr><th>Richtung</th><th>Einstieg</th><th>Stop-Loss</th><th>Take-Profit</th><th>Stückzahl (oz)</th><th>Unrealisierter P/L</th><th>Aktion</th></tr></thead><tbody id="trades"><tr><td colspan="7" class="muted">Noch keine Trades</td></tr></tbody></table></div>
@@ -61,11 +61,11 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;p
 <script>
 const $=id=>document.getElementById(id);
 let quote=null,candles=[],trades=JSON.parse(localStorage.getItem('xau_trades')||'[]'),balance=Number(localStorage.getItem('xau_balance')||1000),bot=localStorage.getItem('xau_bot')==='1',lastBotBar=null;
-$('goldKey').value=localStorage.getItem('gold_key')||'';$('twelveKey').value=localStorage.getItem('twelve_key')||'';
+$('twelveKey').value=localStorage.getItem('twelve_key')||'';
 const money=n=>Number.isFinite(n)?'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
 function save(){localStorage.setItem('xau_trades',JSON.stringify(trades));localStorage.setItem('xau_balance',String(balance));localStorage.setItem('xau_bot',bot?'1':'0')}
 function setStatus(t,ok=false){$('connection').textContent=(ok?'● ':'● ')+t;$('connection').style.color=ok?'var(--green)':'var(--gold)'}
-async function getQuote(){const key=$('goldKey').value.trim();if(!key)throw Error('GoldAPI-Key fehlt');const r=await fetch('https://www.goldapi.io/api/XAU/USD',{headers:{'x-access-token':key,'Content-Type':'application/json'}});if(!r.ok)throw Error('GoldAPI HTTP '+r.status);const d=await r.json();quote={price:+d.price,bid:+d.bid,ask:+d.ask,high:+d.high_price,low:+d.low_price,change:+d.change,changePct:+d.change_percent};$('price').textContent=money(quote.price);$('bidask').textContent=quote.bid.toFixed(2)+' / '+quote.ask.toFixed(2);$('spread').textContent=money(quote.ask-quote.bid);$('range').textContent='Tagesrange: '+quote.low.toFixed(2)+' – '+quote.high.toFixed(2);$('change').textContent=(quote.change>=0?'+':'')+quote.change.toFixed(2)+' ('+quote.changePct.toFixed(2)+' %)';$('change').className=quote.change>=0?'positive':'negative';setStatus('GoldAPI verbunden',true)}
+async function getQuote(){const r=await fetch('/api/quote',{cache:'no-store'});if(!r.ok)throw Error('Lokale MT5-Verbindung nicht erreichbar');const d=await r.json();if(!d.connected||!d.bid||!d.ask)throw Error('Warte auf Vantage-MT5-Kurs');quote={price:d.last>0?+d.last:(+d.bid+ +d.ask)/2,bid:+d.bid,ask:+d.ask,high:0,low:0,change:0,changePct:0};$('price').textContent=money(quote.price);$('bidask').textContent=quote.bid.toFixed(2)+' / '+quote.ask.toFixed(2);$('spread').textContent=money(quote.ask-quote.bid);$('range').textContent='Symbol: '+d.symbol+' · Spread: '+Number(d.spread_points||0)+' Punkte';$('change').textContent='Vantage MT5 · Live';$('change').className='positive';const stamp=d.time?new Date(d.time).toLocaleTimeString():'—';$('quoteTime').textContent='Letzter Tick: '+stamp;$('feedTime').textContent=stamp;setStatus('Vantage MT5 verbunden',true)}
 async function getCandles(){const key=$('twelveKey').value.trim();if(!key)throw Error('Twelve Data-Key fehlt');const interval=$('interval').value;const url='https://api.twelvedata.com/time_series?symbol=XAU/USD&interval='+encodeURIComponent(interval)+'&outputsize=120&apikey='+encodeURIComponent(key);const r=await fetch(url);if(!r.ok)throw Error('Twelve Data HTTP '+r.status);const d=await r.json();if(d.status==='error'||!d.values)throw Error(d.message||'Keine Kerzendaten');candles=d.values.slice().reverse().map(x=>({time:x.datetime,open:+x.open,high:+x.high,low:+x.low,close:+x.close}));drawChart();analyse()}
 function ema(vals,period){let k=2/(period+1),out=[];vals.forEach((v,i)=>out.push(i? v*k+out[i-1]*(1-k):v));return out}
 function analyse(){if(candles.length<25)return;const c=candles.map(x=>x.close),e9=ema(c,9),e21=ema(c,21),i=c.length-1;const trend=e9[i]>e21[i]?'Aufwärtstrend':e9[i]<e21[i]?'Abwärtstrend':'Seitwärts';$('trend').textContent=trend;$('trend').className=e9[i]>e21[i]?'positive':e9[i]<e21[i]?'negative':'';let ts=e9[i]>e21[i]&&c[i]>c[i-1]?'BUY':e9[i]<e21[i]&&c[i]<c[i-1]?'SELL':'NEUTRAL';$('trendSignal').textContent=ts;const recent=candles.slice(-21,-1),hi=Math.max(...recent.map(x=>x.high)),lo=Math.min(...recent.map(x=>x.low));let zs=c[i]>hi?'BUY':c[i]<lo?'SELL':'NEUTRAL';$('zoneSignal').textContent=zs; if(bot)runBot(ts,zs,candles[i]);}
@@ -76,11 +76,11 @@ function manageTrades(){if(!quote)return;for(const t of trades.filter(x=>x.statu
 function render(){const open=trades.filter(t=>t.status==='OPEN');$('openCount').textContent=open.length+' offen';$('balance').textContent=money(balance);const unreal=open.reduce((s,t)=>s+(quote?(t.side==='BUY'?quote.bid-t.entry:t.entry-quote.ask)*t.qty:0),0);$('equity').textContent='Equity: '+money(balance+unreal);$('trades').innerHTML=trades.length?trades.slice().reverse().map(t=>{const pnl=t.status==='OPEN'&&quote?(t.side==='BUY'?quote.bid-t.entry:t.entry-quote.ask)*t.qty:t.pnl||0;return '<tr><td class="'+(t.side==='BUY'?'buy':'sell')+'">'+t.side+' <span class="muted">'+t.source+'</span></td><td>'+t.entry.toFixed(2)+'</td><td>'+t.sl.toFixed(2)+'</td><td>'+t.tp.toFixed(2)+'</td><td>'+t.qty.toFixed(4)+'</td><td class="'+(pnl>=0?'positive':'negative')+'">'+money(pnl)+' '+(t.status==='CLOSED'?'(geschlossen)':'')+'</td><td>'+(t.status==='OPEN'?'<button data-close="'+t.id+'">Schließen</button>':'—')+'</td></tr>'}).join(''):'<tr><td colspan="7" class="muted">Noch keine Trades</td></tr>';document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeTrade(Number(b.dataset.close)))}
 function closeTrade(id){const t=trades.find(x=>x.id===id);if(!t||t.status!=='OPEN'||!quote)return;const px=t.side==='BUY'?quote.bid:quote.ask;t.pnl=(t.side==='BUY'?px-t.entry:t.entry-px)*t.qty;t.exit=px;t.status='CLOSED';balance+=t.pnl;save();render()}
 async function refresh(){try{await getQuote();await getCandles();manageTrades()}catch(e){setStatus(e.message);console.warn(e)}}
-$('saveKeys').onclick=()=>{localStorage.setItem('gold_key',$('goldKey').value.trim());localStorage.setItem('twelve_key',$('twelveKey').value.trim());refresh()};
-$('forgetKeys').onclick=()=>{localStorage.removeItem('gold_key');localStorage.removeItem('twelve_key');$('goldKey').value='';$('twelveKey').value='';setStatus('API-Schlüssel gelöscht')};
+$('saveKeys').onclick=()=>{localStorage.setItem('twelve_key',$('twelveKey').value.trim());getCandles().catch(e=>setStatus(e.message))};
+$('forgetKeys').onclick=()=>{localStorage.removeItem('twelve_key');$('twelveKey').value='';setStatus('Kerzen-API-Schlüssel gelöscht')};
 $('refresh').onclick=refresh;$('interval').onchange=()=>getCandles().catch(e=>setStatus(e.message));
 $('openTrade').onclick=()=>{if(!quote)return alert('Zuerst Kursdaten laden.');const side=$('direction').value,sl=Number($('slDistance').value),tp=Number($('tpDistance').value);if(sl<=0||tp<=0)return alert('SL- und TP-Abstand müssen größer 0 sein.');openPaper(side,side==='BUY'?quote.ask:quote.bid,sl,tp);};
 $('toggleBot').onclick=()=>{bot=!bot;save();$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';if(bot)analyse()};
 $('reset').onclick=()=>{if(confirm('Paper-Konto und Trade-Historie wirklich zurücksetzen?')){trades=[];balance=1000;save();render()}};
-$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';render();refresh();setInterval(refresh,60000);
+$('botStatus').textContent=bot?'AKTIV':'AUS';$('toggleBot').textContent=bot?'Automatik stoppen':'Automatik starten';render();refresh();setInterval(()=>getQuote().then(manageTrades).catch(e=>setStatus(e.message)),1000);setInterval(()=>getCandles().catch(e=>console.warn(e)),60000);
 </script></body></html>
