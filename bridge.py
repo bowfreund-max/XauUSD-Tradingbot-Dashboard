@@ -23,7 +23,7 @@ TG_POLL_SECONDS = 60
 MAX_SIGNALS = 100
 
 def clean_text(value):
-    return re.sub(r"\\s+", " ", value or "").strip()
+    return re.sub(r"\s+", " ", value or "").strip()
 
 class TelegramHTMLParser(HTMLParser):
     """Extract public preview messages from Telegram's t.me/s pages."""
@@ -75,38 +75,36 @@ class TelegramHTMLParser(HTMLParser):
 
 def extract_posts(html):
     # Telegram's public preview uses repeated tgme_widget_message blocks.
-    blocks = re.findall(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"]+)"[\s\S]*?(?=<div class="tgme_widget_message[^"]*"|</section>)', html)
+        blocks = re.findall(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"]+)"([\s\S]*?)(?=<div class="tgme_widget_message[^"]*"|</section>)', html)
     posts = []
-    for block in blocks:
-        post_id = re.search(r'^([^/]+/\d+)', block[0])
-        raw = block[1]
+    for post_id, raw in blocks:
         tm = re.search(r'<time[^>]*datetime="([^"]+)"', raw)
         chunks = re.findall(r'<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)</div>', raw)
         if not chunks:
             continue
-        txt = re.sub(r'<br\\s*/?>', ' ', chunks[0], flags=re.I)
+        txt = re.sub(r'<br\s*/?>', ' ', chunks[0], flags=re.I)
         txt = re.sub(r'<[^>]+>', ' ', txt)
         txt = clean_text(txt.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&#39;', "'").replace('&quot;', '"'))
-        posts.append({"id": block[0], "text": txt, "time": tm.group(1) if tm else None})
+        posts.append({"id": post_id, "text": txt, "time": tm.group(1) if tm else None})
     return posts
 
 def parse_signal(post, source):
     text = post.get("text", "")
     upper = text.upper()
-    if not re.search(r"\\b(XAUUSD|XAU/USD|GOLD)\\b", upper):
+    if not re.search(r"\b(XAUUSD|XAU/USD|GOLD)\b", upper):
         return None
-    direction_match = re.search(r"\\b(BUY|SELL)\\b", upper)
+    direction_match = re.search(r"\b(BUY|SELL)\b", upper)
     if not direction_match:
         return None
     side = direction_match.group(1)
-    sl_match = re.search(r"\\b(?:SL|STOP\\s*LOSS)\\s*[:=@-]?\\s*(\\d{3,5}(?:\\.\\d+)?)", upper)
-    tp_match = re.search(r"\\b(?:TP\\s*1?|TAKE\\s*PROFIT)\\s*[:=@-]?\\s*(\\d{3,5}(?:\\.\\d+)?)", upper)
+    sl_match = re.search(r"\b(?:SL|STOP\s*LOSS)\s*[:=@-]?\s*(\d{3,5}(?:\.\d+)?)", upper)
+    tp_match = re.search(r"\b(?:TP\s*1?|TAKE\s*PROFIT)\s*[:=@-]?\s*(\d{3,5}(?:\.\d+)?)", upper)
     if not sl_match or not tp_match:
         return None
-    entry_match = re.search(r"\\bENTRY(?:\\s*ZONE)?\\s*[:=@-]?\\s*(\\d{3,5}(?:\\.\\d+)?)(?:\\s*[-–/]\\s*(\\d{3,5}(?:\\.\\d+)?))?", upper)
+    entry_match = re.search(r"\bENTRY(?:\s*ZONE)?\s*[:=@-]?\s*(\d{3,5}(?:\.\d+)?)(?:\s*[-–/]\s*(\d{3,5}(?:\.\d+)?))?", upper)
     if not entry_match:
         after_direction = upper[direction_match.end():]
-        entry_match = re.search(r"(?:LIMIT|STOP)?\\s*[:=@-]?\\s*(\\d{3,5}(?:\\.\\d+)?)", after_direction)
+        entry_match = re.search(r"(?:LIMIT|STOP)?\s*[:=@-]?\s*(\d{3,5}(?:\.\d+)?)", after_direction)
     if not entry_match:
         return None
     if entry_match.lastindex and entry_match.lastindex >= 2 and entry_match.group(2):
